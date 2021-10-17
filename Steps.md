@@ -1,6 +1,6 @@
 # WEB-SOLUTION-WITH-WORDPRESS
 
-Before we start we need to have an environment to work with. I will we using my AWS account to create an EC2 instance with an Ubuntu Server.
+Before we start we need to have an environment to work with. I will we using my AWS account to create two EC2 instances (**Webserver** and **DB Server**)with Red-Hat as the OS. 
 
 
 Use link:
@@ -32,6 +32,7 @@ You should see a list of instances in the same availability zone as the **EBS Vo
 ![Markdown Logo](https://raw.githubusercontent.com/hectorproko/WEB-SOLUTION-WITH-WORDPRESS/main/Images/attachVolume2.png)
  <br>
 
+Now I'll login to instnace with the role of **Webserver** <br>
 On the Red-Hat terminal using  **lsblk** I can see the volumes attached as xvdf, xvdg, xvdh.
 ```perl
 [ec2-user@ip-172-31-86-213 ~]$ lsblk
@@ -284,3 +285,106 @@ Format the **Logical Volumes** to **ext4**
 sudo mkfs -t ext4 /dev/webdata-vg/apps-lv
 sudo mkfs -t ext4 /dev/webdata-vg/logs-lv
 ```
+We need to create directories
+```bash
+[ec2-user@ip-172-31-86-213 ~]$ sudo mkdir -p /var/www/html #will be used as mounting point
+[ec2-user@ip-172-31-86-213 ~]$ sudo mkdir -p /home/recovery/logs #temporary dir
+```
+We will use the following as the **mountpoints** for our **Logical Volumes**
+```bash
+/var/www/html
+/var/log
+```
+Before we can use /var/log as a mountpoint we need to move its contents to a temporary location /home/recovery/logs and put it back after mount. The process of mounting deletes contents of a folder
+```bash
+[ec2-user@ip-172-31-86-213 ~]$ sudo mount /dev/webdata-vg/apps-lv /var/www/html/ #first mount
+```
+Moving files/logs to temporary dir
+```bash
+[ec2-user@ip-172-31-86-213 logs]$ sudo rsync -av /var/log/. /home/recovery/logs
+sending incremental file list #Partial output
+./
+boot.log
+btmp
+...
+...
+...
+...
+sent 13,460,465 bytes  received 808 bytes  8,974,182.00 bytes/sec
+total size is 13,454,303  speedup is 1.00
+[ec2-user@ip-172-31-86-213 logs]$
+```
+Now we can mount and return the file/logs to original place
+```bash
+[ec2-user@ip-172-31-86-213 logs]$ sudo mount /dev/webdata-vg/logs-lv /var/log #mounting
+[ec2-user@ip-172-31-86-213 logs]$ sudo rsync -av /home/recovery/logs/. /var/log #putting files back
+sending incremental file list
+./
+boot.log
+…
+….
+…..
+sent 13,460,466 bytes  received 808 bytes  8,974,182.67 bytes/sec
+total size is 13,454,303  speedup is 1.00
+[ec2-user@ip-172-31-86-213 logs]$
+```
+
+You can see your mounts by running **df -h**
+```bash
+[ec2-user@ip-172-31-86-213 ~]$ df -h
+Filesystem                        Size  Used Avail Use% Mounted on
+devtmpfs                          377M     0  377M   0% /dev
+tmpfs                             404M     0  404M   0% /dev/shm
+tmpfs                             404M   11M  393M   3% /run
+tmpfs                             404M     0  404M   0% /sys/fs/cgroup
+/dev/xvda2                         10G  1.3G  8.8G  13% /
+tmpfs                              81M     0   81M   0% /run/user/1000
+/dev/mapper/webdata--vg-apps--lv   14G   41M   13G   1% /var/www/html #here
+/dev/mapper/webdata--vg-logs--lv   14G   53M   13G   1% /var/log      #here
+```
+
+These mounts will not persist after boot. So we need to add them to /etc/**fstab** using a file editor like **vi**
+```bash
+sudo vi /etc/fstab
+```
+Before editing we need to get the **UUID** of the device we are trying to mount. We can also use the path but UUID is recommended. To see device UUIDs run **blkid**
+```bash
+[ec2-user@ip-172-31-86-213 ~]$ sudo blkid
+/dev/xvda2: UUID="c9aa25ee-e65c-4818-9b2f-fa411d89f585" BLOCK_SIZE="512" TYPE="xfs" PARTUUID="b3824610-751c-49f8-a4a9-068fa13d9460"
+/dev/xvdh1: UUID="dJ5O9U-dSiK-zJMu-ZYJl-50t1-uIHA-ZzCNpi" TYPE="LVM2_member" PARTLABEL="Linux filesystem" PARTUUID="597ef000-2a42-4862-951d-4f69809de14d"
+/dev/xvdg1: UUID="e4jN5M-Ld0w-ovkT-Vvad-CLdy-29pN-7vKLcl" TYPE="LVM2_member" PARTLABEL="Linux filesystem" PARTUUID="64aa68d6-57d6-4bda-a9c7-0e6fd4fdd08f"
+/dev/xvdf1: UUID="iURybq-N3Ib-WPCr-oRLY-pUNN-H141-RnzRwB" TYPE="LVM2_member" PARTLABEL="Linux filesystem" PARTUUID="6d3527e6-3498-4402-8370-6adfa9676a75"
+#These
+/dev/mapper/webdata--vg-apps--lv: UUID="ebcfa2a8-c68e-4602-b59e-f1509690ff5b" BLOCK_SIZE="4096" TYPE="ext4"
+/dev/mapper/webdata--vg-logs--lv: UUID="3b9c7f88-da27-42ac-8a55-a6a5ef159856" BLOCK_SIZE="4096" TYPE="ext4" 
+#two
+/dev/xvda1: PARTUUID="3e18b896-4879-4ede-8711-a58017aff81c"
+```
+
+Now our entry in the **fstab** looks like this
+```bash
+UUID=c9aa25ee-e65c-4818-9b2f-fa411d89f585 /                       xfs     defaults        0 0
+
+#Wordpress related mounts
+UUID=ebcfa2a8-c68e-4602-b59e-f1509690ff5b /var/www/html           ext4    defaults        0 0
+UUID=3b9c7f88-da27-42ac-8a55-a6a5ef159856 /var/log                ext4    defaults        0 0
+```
+Save the changes and run
+```bash
+sudo mount -a
+```
+If you get any output the is something wrong with the file. Fix or your system might not be able to boot next time.
+
+To convert configuration files that are not native unit files dynamically into native unit file run
+```bash
+sudo systemctl daemon-reload
+```
+
+### Install WordPress on your Web Server EC2
+```bash
+#Update reposity
+sudo yum -y update
+#Install wget, Apache, php
+sudo yum -y install wget httpd php php-mysqlnd php-fpm php-json
+#Start Apache
+sudo systemctl start httpd
