@@ -388,3 +388,90 @@ sudo yum -y update
 sudo yum -y install wget httpd php php-mysqlnd php-fpm php-json
 #Start Apache
 sudo systemctl start httpd
+#start Apache on boot
+sudo systemctl enable httpd
+#PHP and dependencies
+sudo yum install https://dl.fedoraproject.org/pub/epel/epel-release-latest-8.noarch.rpm
+sudo yum install yum-utils http://rpms.remirepo.net/enterprise/remi-release-8.rpm
+sudo yum module list php
+sudo yum module reset php
+sudo yum module enable php:remi-7.4
+sudo yum install php php-opcache php-gd php-curl php-mysqlnd
+sudo systemctl start php-fpm
+sudo systemctl enable php-fpm #start php on boot
+setsebool -P httpd_execmem 1 #To allow httpd to execute files
+#restart Apache
+sudo systemctl restart httpd
+#Downloading wordpress
+mkdir wordpress
+cd   wordpress
+sudo wget http://wordpress.org/latest.tar.gz
+sudo tar xzvf latest.tar.gz #unziping
+sudo rm -rf latest.tar.gz #removing
+sudo cp wordpress/wp-config-sample.php wordpress/wp-config.php #creating config from sample
+sudo cp -R wordpress /var/www/html/
+#Configure SELinux Policies
+sudo chown -R apache:apache /var/www/html/wordpress #chaging owner of wordpress
+sudo chcon -t httpd_sys_rw_content_t /var/www/html/wordpress -R 
+sudo setsebool -P httpd_can_network_connect=1 #Allow HTTPD scripts and modules to connect to the network
+```
+## Instance with DB Role
+
+I will repeat the same steps as far as creating 3 **EBS Volumes** and creating 2 **Logical Volumes**, **db-lv** mounted in **/db** and **logs-lv** mounted in **/var/logs** <br>
+Just like with **Webserver** for the mount to persist we need to added in **fstab**
+```bash
+[ec2-user@ip-172-31-19-178 ~]$ cat /etc/fstab
+UUID=c9aa25ee-e65c-4818-9b2f-fa411d89f585 /                       xfs     defaults        0 0
+
+#DB mounts
+UUID=38a5b23b-b51e-4807-ad71-5afb59960b1a /db                     ext4    defaults        0 0
+UUID=f2c5b96f-d543-4a3e-aebf-2f730d5050e3 /var/log                ext4    defaults        0 0
+[ec2-user@ip-172-31-19-178 ~]$
+```
+Install MySQL
+```bash
+sudo yum update -y
+sudo yum install mysql-server -y
+sudo systemctl enable mysqld #start on boot
+```
+Check that MySQL is running
+```bash
+[ec2-user@ip-172-31-19-178 ~]$ sudo systemctl status mysqld
+● mysqld.service - MySQL 8.0 database server
+   Loaded: loaded (/usr/lib/systemd/system/mysqld.service; disabled; vendor preset: disabled)
+   Active: inactive (dead)
+[ec2-user@ip-172-31-19-178 ~]$
+```
+Now we will create a database **wordpress** and user **sample_user** with all permissions when connecting from **Webserver** (172.31.86.213)
+```MySQL
+sudo mysqld
+mysql> CREATE DATABASE wordpress;
+Query OK, 1 row affected (0.01 sec)
+
+mysql> CREATE USER 'sample_user'@'172.31.86.213' IDENTIFIED BY 'Passw0rd!';
+Query OK, 0 rows affected (0.00 sec)
+
+mysql> GRANT ALL ON wordpress.* TO 'sample_user'@'172.31.86.213';
+Query OK, 0 rows affected (0.00 sec)
+
+mysql> FLUSH PRIVILEGES;
+Query OK, 0 rows affected (0.01 sec)
+
+mysql> SHOW DATABASES;
++--------------------+
+| Database           |
++--------------------+
+| information_schema |
+| mysql              |
+| performance_schema |
+| sys                |
+| wordpress          |
++--------------------+
+5 rows in set (0.00 sec)
+mysql> exit
+Bye
+```
+Now we are going to add a rule to our **Security Group** to open **TCP** port **3306** but the source of the connection has to be from **Webserver** (in this case 172.31.86.213/32)
+
+Use link:
+[Opening Ports in AWS](https://github.com/hectorproko/RepeatableSteps_tutorials/blob/main/OpenPortAWS.md)   
