@@ -474,4 +474,32 @@ Bye
 Now we are going to add a rule to our **Security Group** to open **TCP** port **3306** but the source of the connection has to be from **Webserver** (in this case 172.31.86.213/32)
 
 Use link:
-[Opening Ports in AWS](https://github.com/hectorproko/RepeatableSteps_tutorials/blob/main/OpenPortAWS.md)   
+[Opening Ports in AWS](https://github.com/hectorproko/RepeatableSteps_tutorials/blob/main/OpenPortAWS.md)  <br> 
+
+
+![Markdown Logo](https://raw.githubusercontent.com/hectorproko/WEB-SOLUTION-WITH-WORDPRESS/main/Images/port3306.png)
+ <br>
+
+ ### Testing connection from **Webserver**
+ ```bash
+ [ec2-user@ip-172-31-86-213 ~]$ sudo mysql -u sample_user -p -h 172.31.19.178
+Enter password:
+Welcome to the MySQL monitor.  Commands end with ; or \g.
+Your MySQL connection id is 11
+Server version: 8.0.21 Source distribution
+
+Copyright (c) 2000, 2020, Oracle and/or its affiliates. All rights reserved.
+
+Oracle is a registered trademark of Oracle Corporation and/or its
+affiliates. Other names may be trademarks of their respective
+owners.
+
+Type 'help;' or '\h' for help. Type '\c' to clear the current input statement.
+
+
+mysql>
+```
+
+### Configure WordPress to connect to remote database
+
+You can edit file **wp-config.php** or access wordpress from your broswer which will 
