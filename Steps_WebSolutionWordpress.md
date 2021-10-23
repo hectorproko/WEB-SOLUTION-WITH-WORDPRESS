@@ -502,4 +502,11 @@ mysql>
 
 ### Configure WordPress to connect to remote database
 
-You can edit file **wp-config.php** or access wordpress from your broswer which will 
+You can edit file **wp-config.php** or access wordpress from your broswer wich will generate this file after answering wizard like step by step questions <br>
+
+
+![Markdown Logo](https://raw.githubusercontent.com/hectorproko/WEB-SOLUTION-WITH-WORDPRESS/main/Images/wordpress1.png)<br>
+ <br /> 
+![Markdown Logo](https://raw.githubusercontent.com/hectorproko/WEB-SOLUTION-WITH-WORDPRESS/main/Images/wordpress2.png)<br>
+ 
+![Markdown Logo](https://raw.githubusercontent.com/hectorproko/WEB-SOLUTION-WITH-WORDPRESS/main/Images/wordpress3.png)<br>
